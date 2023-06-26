@@ -9,6 +9,8 @@ import {defaults as defaultControls, OverviewMap} from 'ol/control';
 import TileLayer from 'ol/layer/Tile';
 import IIIF from 'ol/source/IIIF';
 import IIIFInfo from 'ol/format/IIIFInfo';
+import WKT from 'ol/format/WKT';
+import DragAndDrop from 'ol/interaction/DragAndDrop.js';
 import {GPX, GeoJSON, IGC, KML, TopoJSON, WFS} from 'ol/format';
 import {Vector as VectorLayer} from 'ol/layer';
 import VectorSource from 'ol/source/Vector';
@@ -19,7 +21,7 @@ import {getTransform} from 'ol/proj';
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
 import {unByKey} from 'ol/Observable';
-import DragAndDrop from 'ol/interaction/DragAndDrop';
+import MousePosition from 'ol/control/MousePosition.js';
 
 import {
   equalTo as equalToFilter,
@@ -196,10 +198,11 @@ iiifTileSource.on('tileloaderror', function() {
         resolutions: iiifTileSource.getTileGrid().getResolutions(),
 //        resolutions: initialresolutions,
         extent: iiifTileSource.getTileGrid().getExtent(),
-	constrainRotation: false,
-	constrainResolution: false,
+		constrainRotation: false,
+		constrainResolution: false,
         constrainOnlyCenter: true
       }));
+	  
 
 	var hash = window.location.hash;
 	if (hash == '')  {
@@ -284,17 +287,19 @@ iiifTileSource.on('tileloaderror', function() {
         resolutions: iiifTileSource.getTileGrid().getResolutions(),
 //        resolutions: initialresolutions,
         extent: iiifTileSource.getTileGrid().getExtent(),
-	constrainRotation: false,
-	constrainResolution: false,
+		constrainRotation: false,
+		constrainResolution: false,
         constrainOnlyCenter: true
       }));
 
       notifyDiv.textContent = '';
 
 
+
 	var hash = window.location.hash;
 	if (hash == '') {
 	      map.getView().fit(iiifTileSource.getTileGrid().getExtent());
+		  newSetCenter();
 		}
 	else if (hash == '#B')
 	{
@@ -338,6 +343,7 @@ map.addControl(overviewMapControl);
 refreshMap(url);
 
 
+
 document.getElementById('map').focus();
 
 jQuery("#showmaplocationinfo").hide();
@@ -347,6 +353,8 @@ jQuery("#showIIIFinfo").hide();
 jQuery("#showlocationinfo").hide();
 
 
+
+	
 function mapHashBack()  {
 
 	var hash = window.location.hash;
@@ -384,6 +392,55 @@ function getMapHash() {
 
 }
 
+function newSetCenter() {
+	
+		var windowHeight = jQuery(window).height();
+		var headerHeight = jQuery("#header").css( "height" );
+		const headerHeightPx = headerHeight.substring(0, 3);
+
+		var windowWidth = jQuery(window).width();
+
+		
+//		console.log("windowWidthPx: " + windowWidth);
+		
+		if ( windowWidth < 850 )
+			
+			{
+		
+						
+						var mapcenter = map.getView().getCenter();
+						
+						console.log("mapcenter: " + mapcenter);
+						
+						var extent = map.getView().calculateExtent(map.getSize());
+						
+						console.log("extent: " + extent);
+//						const height = parseInt(Math.abs(extent[1])) + parseInt(Math.abs(extent[3])) ; 
+						
+						const height = parseInt(Math.abs(extent[1])); 
+								console.log("height: " + height);
+						
+						const headerHeightProportion = (  parseInt(windowHeight) /   parseInt(headerHeightPx) );
+						
+								console.log("headerHeightProportion: " + headerHeightProportion);
+										
+						const heightProportion = (height / headerHeightProportion  ); 
+						
+								console.log("heightProportion: " + heightProportion);
+						const newYcoord = -Math.abs(mapcenter[1].toFixed(0)) +( parseInt(heightProportion) / 2);
+			
+						mapcenter_new = [ Math.round(mapcenter[0]), Math.round(newYcoord)];
+						console.log("mapcenter_new: " + mapcenter_new);
+						map.getView().setCenter(mapcenter_new);
+			}
+			else
+			{
+				return;
+			}
+
+
+}
+
 function setZoomLatLon() {
 
 	if ( currentZoom === undefined || currentLat === undefined  || currentLon === undefined)
@@ -399,6 +456,28 @@ function setZoomLatLon() {
 	var lat2 = parseInt(Math.abs(extent[1]) - currentLat);
 	var lat3 = parseInt(Math.abs(lat2));
 	map.getView().setCenter([currentLon,-lat3] );
+	
+	
+				var mouseposition = new MousePosition({
+				className: 'ol-mouse-position',
+				coordinateFormat: function(coordinate) {				
+
+					var centre1 = parseInt(coordinate[0].toFixed(0));
+					var centre2 = parseInt(coordinate[1].toFixed(0));
+					var extent = map.getLayers().getArray()[0].getSource().getTileGrid().getExtent();
+					var lat1 = (extent[1] - centre2);
+					return  "&nbsp;Pixels - from left: " + centre1 + " / from top: " + (centre2  *= -1)  + "&nbsp;" ;
+				}
+			});
+
+			map.addControl(mouseposition);
+			
+			if (window.location.href.indexOf("https://maps.nls.uk/view-full")  !== 0)
+			{
+			jQuery("#viewerback").hide(); 
+
+			}
+
 }
 
 
@@ -414,14 +493,11 @@ function updateLocationToURL() {
 
 
 
+var fullscreenmobileInput = document.getElementById('full-screen-mobile');
 
+if(fullscreenmobileInput){
 
-
-var addLocationToURLInput = document.getElementById('addLocationToURL');
-
-if(addLocationToURLInput){
-
-	addLocationToURLInput.addEventListener('click', function() {
+	fullscreenmobileInput.addEventListener('click', function() {
 		var zoom = Math.round(map.getView().getZoom().toFixed(1));
 		var centre = map.getView().getCenter();
 		var centre1 = parseInt(centre[0].toFixed(0));
@@ -429,6 +505,149 @@ if(addLocationToURLInput){
 		var extent = map.getLayers().getArray()[0].getSource().getTileGrid().getExtent();
 		var lat1 = (extent[1] - centre2);
 		window.location.hash = "zoom=" + zoom  + "&lat=" + Math.abs(lat1) + "&lon=" + centre1  +  "&layers=BT";
+				
+			var pageurl1 = window.location.href;
+
+			if (pageurl1.indexOf("https://maps.nls.uk/view/") >= 0)
+				{
+					var pageurl = pageurl1.replace('https://maps.nls.uk/view/', 'https://maps.nls.uk/view-full/');
+				}
+			else
+			{
+			var pageurl = '74428019';
+			}
+			
+			window.location = pageurl;
+			
+			});
+	}
+	
+	
+var fullscreenInput = document.getElementById('full-screen');
+
+if(fullscreenInput){
+
+	fullscreenInput.addEventListener('click', function() {
+		var zoom = Math.round(map.getView().getZoom().toFixed(1));
+		var centre = map.getView().getCenter();
+		var centre1 = parseInt(centre[0].toFixed(0));
+		var centre2 = parseInt(centre[1].toFixed(0));
+		var extent = map.getLayers().getArray()[0].getSource().getTileGrid().getExtent();
+		var lat1 = (extent[1] - centre2);
+		window.location.hash = "zoom=" + zoom  + "&lat=" + Math.abs(lat1) + "&lon=" + centre1  +  "&layers=BT";
+				
+			var pageurl1 = window.location.href;
+
+			if (pageurl1.indexOf("https://maps.nls.uk/view/") >= 0)
+				{
+					var pageurl = pageurl1.replace('https://maps.nls.uk/view/', 'https://maps.nls.uk/view-full/');
+				}
+			else
+			{
+			var pageurl = '74428019';
+			}
+			
+			window.location = pageurl;
+			
+			});
+	}
+
+
+var addLocationToURLInput = document.getElementById('addLocationToURL');
+
+if(addLocationToURLInput){
+
+	addLocationToURLInput.addEventListener('click', function() {
+		
+		  jQuery("#iiif-notification").show();
+
+			document.getElementById('iiif-notification').innerHTML = "Suffix added to URL, linking to the specific part of the map you are viewing on screen"; 
+			setTimeout( function(){
+			document.getElementById("iiif-notification").innerHTML = "";
+			jQuery("#iiif-notification").hide();
+
+	}, 5000); // delay 1000 ms
+		
+		
+		var zoom = Math.round(map.getView().getZoom().toFixed(1));
+		var centre = map.getView().getCenter();
+		var centre1 = parseInt(centre[0].toFixed(0));
+		var centre2 = parseInt(centre[1].toFixed(0));
+		var extent = map.getLayers().getArray()[0].getSource().getTileGrid().getExtent();
+		var lat1 = (extent[1] - centre2);
+		window.location.hash = "zoom=" + zoom  + "&lat=" + Math.abs(lat1) + "&lon=" + centre1  +  "&layers=BT";
+		document.getElementById("map").focus();
+		
+			var mouseposition = new MousePosition({
+			className: 'ol-mouse-position',
+				coordinateFormat: function(coordinate) {				
+
+					var centre1 = parseInt(coordinate[0].toFixed(0));
+					var centre2 = parseInt(coordinate[1].toFixed(0));
+					var extent = map.getLayers().getArray()[0].getSource().getTileGrid().getExtent();
+					var lat1 = (extent[1] - centre2);
+					return  "&nbsp;Pixels - from left: " + centre1 + " / from top: " + (centre2  *= -1)  + "&nbsp;" ;
+				}
+			});
+		
+
+			map.addControl(mouseposition);
+			
+			if (window.location.href.indexOf("https://maps.nls.uk/view-full")  !== 0)
+			{
+			jQuery("#viewerback").hide(); 
+
+			}
+			
+
+	});
+
+}
+
+
+	map.on('moveend', function() {
+		var hash = window.location.hash;
+		if (hash.length > 0)
+			{
+			getMapHash();
+			var zoom = Math.round(map.getView().getZoom().toFixed(1));
+			var centre = map.getView().getCenter();
+			var centre1 = parseInt(centre[0].toFixed(0));
+			var centre2 = parseInt(centre[1].toFixed(0));
+			var extent = map.getLayers().getArray()[0].getSource().getTileGrid().getExtent();
+			var lat1 = (extent[1] - centre2);
+			window.location.hash = "zoom=" + zoom  + "&lat=" + Math.abs(lat1) + "&lon=" + centre1  +  "&layers=BT";
+
+			}
+
+	else
+		{
+		window.location.href.substr(0, window.location.href.indexOf('#'));
+		}
+
+});
+
+
+
+var addLocationToURLInputMobile = document.getElementById('addLocationToURLMobile');
+
+if(addLocationToURLInputMobile){
+
+	addLocationToURLInputMobile.addEventListener('click', function() {
+		var zoom = Math.round(map.getView().getZoom().toFixed(1));
+		var centre = map.getView().getCenter();
+		var centre1 = parseInt(centre[0].toFixed(0));
+		var centre2 = parseInt(centre[1].toFixed(0));
+		var extent = map.getLayers().getArray()[0].getSource().getTileGrid().getExtent();
+		var lat1 = (extent[1] - centre2);
+		window.location.hash = "zoom=" + zoom  + "&lat=" + Math.abs(lat1) + "&lon=" + centre1  +  "&layers=BT";
+		
+				// Get the modal
+		var WMTSmodal = document.getElementById("WMTSModal");
+	
+		WMTSmodal.style.display = "block";
+		WMTScontent.innerHTML =  window.location.href;
+		
 		document.getElementById("map").focus();
 	});
 
@@ -454,6 +673,10 @@ if(addLocationToURLInput){
 		{
 		window.location.href.substr(0, window.location.href.indexOf('#'));
 		}
+		
+
+
+	
 
 });
 
@@ -544,6 +767,85 @@ printPDFNotinprocess = true;
 
 
 
+var exportButton = document.getElementById("export-pdf-mobile");
+
+if(exportButton){
+
+
+exportButton.addEventListener('click', function() {
+
+printPDFNotinprocess = false;
+
+	jQuery("#morePanel").hide();
+	
+	jQuery("#footermore").show();
+
+	jQuery("#mobile-notification").show();
+
+	document.getElementById('mobile-notification').innerHTML = "Generating PDF - please wait...";
+			setTimeout( function(){
+			document.getElementById("mobile-notification").innerHTML = "";
+			jQuery("#mobile-notification").hide();
+
+	}, 1500); // delay 1000 ms
+
+
+map.removeControl(overviewMapControl);
+
+  exportButton.disabled = true;
+  document.body.style.cursor = 'progress';
+
+    var format = "a3";
+    var resolution = "72";
+    var dim = [420, 297];
+    var width = Math.round((420 * resolution) / 25.4);
+    var height = Math.round((297 * resolution) / 25.4);
+    var size = map.getSize();
+    var viewResolution = map.getView().getResolution();
+
+  map.once('rendercomplete', function() {
+    var mapCanvas = document.createElement('canvas');
+    mapCanvas.width = width;
+    mapCanvas.height = height;
+    var mapContext = mapCanvas.getContext('2d');
+    Array.prototype.forEach.call(document.querySelectorAll('.ol-layer canvas'), function(canvas) {
+      if (canvas.width > 0) {
+        var opacity = canvas.parentNode.style.opacity;
+        mapContext.globalAlpha = opacity === '' ? 1 : Number(opacity);
+        var transform = canvas.style.transform;
+        // Get the transform parameters from the style's transform matrix
+        var matrix = transform.match(/^matrix\(([^\(]*)\)$/)[1].split(',').map(Number);
+        // Apply the transform to the export map context
+        CanvasRenderingContext2D.prototype.setTransform.apply(mapContext, matrix);
+        mapContext.drawImage(canvas, 0, 0);
+      }
+    });
+    var pdf = new jsPDF('landscape', undefined, format);
+    pdf.addImage(mapCanvas.toDataURL('image/jpeg'), 'JPEG', 0, 0, 420, 297);
+    pdf.save('map.pdf');
+    // Reset original map size
+    map.setSize(size);
+    map.getView().setResolution(viewResolution);
+    exportButton.disabled = false;
+    document.body.style.cursor = 'auto';
+    document.getElementById("map").focus();
+  });
+
+  // Set print size
+  var printSize = [width, height];
+  map.setSize(printSize);
+  var scaling = Math.min(width / size[0], height / size[1]);
+  map.getView().setResolution(viewResolution / scaling);
+
+map.addControl(overviewMapControl);
+
+  }, false);
+
+printPDFNotinprocess = true;
+
+}
+
+
 
    var vectorSource_new = new VectorSource();
    var vectorLayer_new = new VectorLayer({
@@ -631,8 +933,10 @@ console.log("pageurl: "  + pageurl);
 	{	var TypeName = 'OS_6inch_all_find'; }
 	else if (map_group_no == '36')
 	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '41')
+	{	var TypeName = 'OS_Town_Plans'; }
 	else if (map_group_no == '42')
-	{	var TypeName = 'os_indexes'; }
+	{	var TypeName = 'os_indexes_counties'; }
 	else if (map_group_no == '43')
 	{	var TypeName = 'os_quarter_inch'; }
 	else if (map_group_no == '44')
@@ -659,13 +963,13 @@ console.log("pageurl: "  + pageurl);
 	else if (map_group_no == '60')
 	{	var TypeName = 'TM_Combined_sorted_27700'; }
 	else if (map_group_no == '65')
-	{	var TypeName = 'One_Inch_land_utilisation_scot'; }
+	{	var TypeName = 'One_Inch_Land_Utilisation_Britain'; }
 	else if (map_group_no == '66')
 	{	var TypeName = 'Soil_Survey'; }
 	else if (map_group_no == '69')
 	{	var TypeName = 'hong_kong'; }
 	else if (map_group_no == '70')
-	{	var TypeName = 'OS_Town_Plans_Eng'; }
+	{	var TypeName = 'OS_Town_Plans'; }
 	else if (map_group_no == '80')
 	{	var TypeName = 'bart_half_combined'; }  
 	else if (map_group_no == '83')
@@ -766,9 +1070,9 @@ console.log("pageurl: "  + pageurl);
 	else if (map_group_no == '168')
 	{	var TypeName = 'OS_National_Grid_all_find'; } 
 	else if (map_group_no == '169')
-	{	var TypeName = 'os_indexes'; } 
+	{	var TypeName = 'os_indexes_counties'; } 
 	else if (map_group_no == '170')
-	{	var TypeName = 'os_indexes'; } 
+	{	var TypeName = 'os_indexes_one_inch'; } 
 	else if (map_group_no == '171')
 	{	var TypeName = 'os_quarter_inch'; } 
 	else if (map_group_no == '173')
@@ -784,11 +1088,35 @@ console.log("pageurl: "  + pageurl);
 	else if (map_group_no == '185')
 	{	var TypeName = 'nls:OS_ten_mile_planning_and_great_britain'; } 
 	else if (map_group_no == '187')
-	{	var TypeName = 'OS_Town_Plans_Eng'; }
+	{	var TypeName = 'OS_Town_Plans'; }
 	else if (map_group_no == '188')
-	{	var TypeName = 'OS_Town_Plans_Eng'; }
+	{	var TypeName = 'OS_Town_Plans'; }
 	else if (map_group_no == '189')
 	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '191')
+	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '192')
+	{	var TypeName = 'catalog_air_photos'; }
+	else if (map_group_no == '200')
+	{	var TypeName = 'OS_Town_Plans'; }
+	else if (map_group_no == '210')
+	{	var TypeName = 'OS_One_Inch_Agricultural_Land_Classification'; }
+	else if (map_group_no == '212')
+	{	var TypeName = 'os_half_inch_admin'; }
+	else if (map_group_no == '213')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '214')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '215')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '216')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '217')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '218')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '219')
+	{	var TypeName = 'os_indexes_one_inch'; }
 	else
 	{
 	var TypeName = 'OS_one_inch_combined';
@@ -797,7 +1125,7 @@ console.log("pageurl: "  + pageurl);
 
 //	alert(TypeName);
 
-	var urlgeoserver =  'https://geo-server.nls.uk/geoserver/wfs?service=WFS' + 
+	var urlgeoserver =  'https://geoserver3.nls.uk/geoserver/wfs?service=WFS' + 
 	 			'&version=2.0.0&request=GetFeature&typename=' + TypeName +
 				'&PropertyName=(the_geom,GROUP,IMAGE,IMAGETHUMB,IMAGEURL,SHEET,DATES,YEAR)&outputFormat=text/javascript&format_options=callback:loadFeatures' +
 				'&srsname=EPSG:900913&CQL_FILTER=IMAGE=' + pageurl;
@@ -816,8 +1144,9 @@ console.log("pageurl: "  + pageurl);
 
 		// generate a GetFeature request
 		var featureRequest = new WFS().writeGetFeature({
+		  request: 'GetFeature',
 		  srsName: 'EPSG:3857',
-		  featureNS: 'http://nls.uk/',
+		  featureNS: 'nls',
 		  featurePrefix: 'nls',
 		  featureTypes: [TypeName],
 		  propertyNames: ['the_geom','GROUP','IMAGE','IMAGETHUMB','IMAGEURL','SHEET','DATES','YEAR'],
@@ -825,15 +1154,20 @@ console.log("pageurl: "  + pageurl);
 		  filter: equalToFilter ('IMAGE', pageurl)
 		});
 		
+
+	
 		// then post the request and add the received features to a layer
-		fetch('https://geoserver3.nls.uk/geoserver/wfs', {
+		fetch('https://geoserver3.nls.uk/geoserver/wfs?service=WFS', {
 
 	      headers : { 
-	        'Content-Type': 'application/json',
-	        'Accept': 'application/json'
+	        'Content-Type': 'text/xml'
+//	        'Accept': 'application/json'
+//			'Access-Control-Allow-Origin': '*'
 	       },
 
+//		  mode: 'no-cors',
 		  method: 'POST',
+//		  body: new URLSearchParams(featureRequest)
 		  body: new XMLSerializer().serializeToString(featureRequest)
 		}).then(function(response) {
 
@@ -900,6 +1234,7 @@ console.log("pageurl: "  + pageurl);
           else if (map_group_no == 38) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=205&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
           else if (map_group_no == 39) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=1&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
           else if (map_group_no == 40) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=164&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 41) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=117746211&zoom=17&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }		  
      	  else if (map_group_no == 43) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=165&zoom=10&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
           else if (map_group_no == 44) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=162&zoom=7&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
 
@@ -991,7 +1326,11 @@ console.log("pageurl: "  + pageurl);
           else if (map_group_no == 187) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=117746212&zoom=17&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
           else if (map_group_no == 188) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=188&zoom=17&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
      	  else if (map_group_no == 189) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=6&zoom=14&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
-
+		  else if (map_group_no == 191) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=6&zoom=14&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+		  else if (map_group_no == 192) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=253&zoom=14&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+		  else if (map_group_no == 195) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=255&zoom=14&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 200) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=117746212&zoom=17&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 210) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=174&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
 	else {
 	window.location = "https://" + window.location.hostname + "/geo/explore/#zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
 		}
@@ -1081,9 +1420,7 @@ jQuery('#viewgeoreferencedlocationpopup').click(function(){
 
 		// alert("left and up fractions: " + pixels_left_percent + ", " + pixels_up_percent);
 
-jQuery("#showmaplocationinfo").show();
 
-	document.getElementById('showmaplocationinfo').innerHTML = "Switching to <em>Explore Georeferenced Maps</em> viewer... please wait";
 
 	history.pushState("", document.title, window.location.pathname + window.location.search);
 
@@ -1118,8 +1455,10 @@ console.log("pageurl: "  + pageurl);
 	{	var TypeName = 'OS_6inch_all_find'; }
 	else if (map_group_no == '36')
 	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '41')
+	{	var TypeName = 'OS_Town_Plans'; }
 	else if (map_group_no == '42')
-	{	var TypeName = 'os_indexes'; }
+	{	var TypeName = 'os_indexes_counties'; }
 	else if (map_group_no == '43')
 	{	var TypeName = 'os_quarter_inch'; }
 	else if (map_group_no == '44')
@@ -1146,13 +1485,13 @@ console.log("pageurl: "  + pageurl);
 	else if (map_group_no == '60')
 	{	var TypeName = 'TM_Combined_sorted_27700'; }
 	else if (map_group_no == '65')
-	{	var TypeName = 'One_Inch_land_utilisation_scot'; }
+	{	var TypeName = 'One_Inch_Land_Utilisation_Britain'; }
 	else if (map_group_no == '66')
 	{	var TypeName = 'Soil_Survey'; }
 	else if (map_group_no == '69')
 	{	var TypeName = 'hong_kong'; }
 	else if (map_group_no == '70')
-	{	var TypeName = 'OS_Town_Plans_Eng'; }
+	{	var TypeName = 'OS_Town_Plans'; }
 	else if (map_group_no == '80')
 	{	var TypeName = 'bart_half_combined'; }  
 	else if (map_group_no == '83')
@@ -1248,9 +1587,9 @@ console.log("pageurl: "  + pageurl);
 	else if (map_group_no == '168')
 	{	var TypeName = 'OS_National_Grid_all_find'; } 
 	else if (map_group_no == '169')
-	{	var TypeName = 'os_indexes'; } 
+	{	var TypeName = 'os_indexes_counties'; } 
 	else if (map_group_no == '170')
-	{	var TypeName = 'os_indexes'; } 
+	{	var TypeName = 'os_indexes_one_inch'; } 
 	else if (map_group_no == '171')
 	{	var TypeName = 'os_quarter_inch'; } 
 	else if (map_group_no == '173')
@@ -1266,11 +1605,35 @@ console.log("pageurl: "  + pageurl);
 	else if (map_group_no == '185')
 	{	var TypeName = 'nls:OS_ten_mile_planning_and_great_britain'; } 
 	else if (map_group_no == '187')
-	{	var TypeName = 'OS_Town_Plans_Eng'; }
+	{	var TypeName = 'OS_Town_Plans'; }
 	else if (map_group_no == '188')
-	{	var TypeName = 'OS_Town_Plans_Eng'; }
+	{	var TypeName = 'OS_Town_Plans'; }
 	else if (map_group_no == '189')
 	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '191')
+	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '192')
+	{	var TypeName = 'catalog_air_photos'; }
+	else if (map_group_no == '200')
+	{	var TypeName = 'OS_Town_Plans'; }
+	else if (map_group_no == '210')
+	{	var TypeName = 'OS_One_Inch_Agricultural_Land_Classification'; }
+	else if (map_group_no == '212')
+	{	var TypeName = 'os_half_inch_admin'; }
+	else if (map_group_no == '213')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '214')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '215')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '216')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '217')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '218')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '219')
+	{	var TypeName = 'os_indexes_one_inch'; }
 	else
 	{
 	var TypeName = 'OS_one_inch_combined';
@@ -1279,7 +1642,7 @@ console.log("pageurl: "  + pageurl);
 
 //	alert(TypeName);
 
-	var urlgeoserver =  'https://geo-server.nls.uk/geoserver/wfs?service=WFS' + 
+	var urlgeoserver =  'https://geoserver3.nls.uk/geoserver/wfs?service=WFS' + 
 	 			'&version=2.0.0&request=GetFeature&typename=' + TypeName +
 				'&PropertyName=(the_geom,GROUP,IMAGE,IMAGETHUMB,IMAGEURL,SHEET,DATES,YEAR)&outputFormat=text/javascript&format_options=callback:loadFeatures' +
 				'&srsname=EPSG:900913&CQL_FILTER=IMAGE=' + pageurl;
@@ -1298,24 +1661,30 @@ console.log("pageurl: "  + pageurl);
 
 		// generate a GetFeature request
 		var featureRequest = new WFS().writeGetFeature({
+		  service: 'WFS',
+		  request: 'GetFeature',
 		  srsName: 'EPSG:3857',
-		  featureNS: 'http://nls.uk/',
+		  featureNS: 'nls',
 		  featurePrefix: 'nls',
 		  featureTypes: [TypeName],
 		  propertyNames: ['the_geom','GROUP','IMAGE','IMAGETHUMB','IMAGEURL','SHEET','DATES','YEAR'],
 		  outputFormat: 'application/json',
 		  filter: equalToFilter ('IMAGE', pageurl)
 		});
+
 		
 		// then post the request and add the received features to a layer
-		fetch('https://geoserver3.nls.uk/geoserver/wfs', {
+		fetch('https://geoserver3.nls.uk/geoserver/wfs?service=WFS', {
 
 	      headers : { 
-	        'Content-Type': 'application/json',
-	        'Accept': 'application/json'
+	        'Content-Type': 'text/xml',
+//	        'Accept': 'application/json'
+//			'Access-Control-Allow-Origin': '*'
 	       },
-
+		   
 		  method: 'POST',
+//		  mode: 'no-cors',
+//		  body: new URLSearchParams(featureRequest)
 		  body: new XMLSerializer().serializeToString(featureRequest)
 		}).then(function(response) {
 
@@ -1350,6 +1719,10 @@ console.log("pageurl: "  + pageurl);
 		else if (features.length > 0)
 
 		{
+			
+			jQuery("#showmaplocationinfo").show();
+
+			document.getElementById('showmaplocationinfo').innerHTML = "Switching to <em>Explore Georeferenced Maps</em> viewer... please wait";
 
 			var coords3857 = [];
 			coords3857 = features[0].getGeometry().getExtent();
@@ -1382,6 +1755,7 @@ console.log("pageurl: "  + pageurl);
           else if (map_group_no == 38) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=205&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
           else if (map_group_no == 39) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=1&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
           else if (map_group_no == 40) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=164&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 41) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=117746211&zoom=17&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
      	  else if (map_group_no == 43) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=165&zoom=10&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
           else if (map_group_no == 44) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=162&zoom=7&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
 
@@ -1473,7 +1847,11 @@ console.log("pageurl: "  + pageurl);
           else if (map_group_no == 187) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=117746212&zoom=17&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
           else if (map_group_no == 188) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=188&zoom=17&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
      	  else if (map_group_no == 189) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=6&zoom=14&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
-
+		  else if (map_group_no == 191) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=6&zoom=14&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+		  else if (map_group_no == 192) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=253&zoom=14&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+		  else if (map_group_no == 195) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=255&zoom=14&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 200) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=117746212&zoom=17&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }	
+	      else if (map_group_no == 210) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=174&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }		  
 	else {
 	window.location = "https://" + window.location.hostname + "/geo/explore/#zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
 		}
@@ -1573,6 +1951,565 @@ showiiifInput.addEventListener('click', function() {
 
 
 
+
+
+jQuery('#viewgeoreferencedlocationpopup-mobile').click(function(){ 
+
+	jQuery("#showlocationinfo").hide();
+
+	jQuery("#morePanel").hide();
+	
+	jQuery("#footermore").show();
+	
+	jQuery("#mobile-notification").show();
+
+	document.getElementById('mobile-notification').innerHTML = "Switching to <em>Explore Georeferenced Maps</em> viewer...<br/>Please wait...";
+
+	document.getElementById("map").focus();
+
+
+
+
+
+
+
+       if (map.getLayers().getArray()[1].getSource().getFeatures().length > 0)
+				{map.getLayers().getArray()[1].getSource().clear(); }
+
+		history.pushState("", document.title, window.location.pathname + window.location.search);
+
+	var pageurl1 = window.location.href;
+
+	if (pageurl1.indexOf("https://maps.nls.uk/view/") >= 0)
+		{
+			var pageurl = pageurl1.replace('https://maps.nls.uk/view/', '');
+		}
+	else
+	{
+	var pageurl = '74428019';
+	}
+
+console.log("pageurl1: "  + pageurl1);
+console.log("pageurl: "  + pageurl);
+
+	// alert("left and up fractions: " + pixels_left_percent + ", " + pixels_up_percent);
+
+
+	var group;
+
+	var vectorSource;
+
+	if (map_group_no == '31')
+	{	var TypeName = 'catalog_air_photos'; }
+	else if (map_group_no == '32')
+	{	var TypeName = 'OS_25000_uk'; }
+	else if (map_group_no == '33')
+	{	var TypeName = 'OS_25inch_all_find';	}
+	else if (map_group_no == '34')
+	{	var TypeName = 'OS_25inch_all_find';	}
+
+	else if (map_group_no == '35')
+	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '36')
+	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '41')
+	{	var TypeName = 'OS_Town_Plans'; }
+	else if (map_group_no == '42')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '43')
+	{	var TypeName = 'os_quarter_inch'; }
+	else if (map_group_no == '44')
+	{	var TypeName = 'OS_ten_mile_planning'; }
+	else if (map_group_no == '45')
+	{	var TypeName = 'bart_half_combined'; }
+
+	else if (map_group_no == '49')
+	{	var TypeName = 'bart_half_combined'; }
+	else if (map_group_no == '50')
+	{	var TypeName = 'bart_half_combined'; }
+	else if (map_group_no == '51')
+	{	var TypeName = 'bart_half_combined'; }
+	else if (map_group_no == '57')
+	{	var TypeName = 'os_london_1056'; }
+	else if (map_group_no == '59')
+	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '60')
+	{	var TypeName = 'TM_Combined_sorted_27700'; }
+	else if (map_group_no == '61')
+	{	var TypeName = 'OS_National_Grid_all_find'; }
+	else if (map_group_no == '64')
+	{	var TypeName = 'OS_25inch_all_find';	}
+	else if (map_group_no == '60')
+	{	var TypeName = 'TM_Combined_sorted_27700'; }
+	else if (map_group_no == '65')
+	{	var TypeName = 'One_Inch_Land_Utilisation_Britain'; }
+	else if (map_group_no == '66')
+	{	var TypeName = 'Soil_Survey'; }
+	else if (map_group_no == '69')
+	{	var TypeName = 'hong_kong'; }
+	else if (map_group_no == '70')
+	{	var TypeName = 'OS_Town_Plans'; }
+	else if (map_group_no == '80')
+	{	var TypeName = 'bart_half_combined'; }  
+	else if (map_group_no == '83')
+	{	var TypeName = 'cyprus_kitchener_3857'; }   
+	else if (map_group_no == '84')
+	{	var TypeName = 'os_half_inch'; }
+	else if (map_group_no == '85')
+	{	var TypeName = 'bart_half_combined'; }
+	else if (map_group_no == '92')
+	{	var TypeName = 'geol_sixinch'; }
+	else if (map_group_no == '93')
+	{	var TypeName = 'geol_sixinch'; }
+	else if (map_group_no == '95')
+	{	var TypeName = 'OS_25000_uk'; }
+	else if (map_group_no == '96')
+	{	var TypeName = 'geol_sixinch'; }
+	else if (map_group_no == '99')
+	{	var TypeName = 'OS_National_Grid_all_find'; }
+	else if (map_group_no == '103')
+	{	var TypeName = 'os_half_inch'; }
+	else if (map_group_no == '104')
+	{	var TypeName = 'OS_25000_uk'; }
+	else if (map_group_no == '105')
+	{	var TypeName = 'OS_25000_uk'; }
+	else if (map_group_no == '106')
+	{	var TypeName = 'OS_25000_uk'; }
+	else if (map_group_no == '107')
+	{	var TypeName = 'os_half_inch'; }
+	else if (map_group_no == '108')
+	{	var TypeName = 'os_half_inch'; }
+	else if (map_group_no == '110')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '111')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '113')
+	{	var TypeName = 'OS_25000_uk'; }
+	else if (map_group_no == '116')
+	{	var TypeName = 'Goad_Insurance_Plans'; }
+	else if (map_group_no == '118')
+	{	var TypeName = 'Survey_of_India_Sheet_58'; }
+	else if (map_group_no == '119')
+	{	var TypeName = 'Survey_of_India_Sheet_58'; }
+	else if (map_group_no == '120')
+	{	var TypeName = 'Johnston_Scotland'; }
+	else if (map_group_no == '121')
+	{	var TypeName = 'bart_half_combined'; }
+	else if (map_group_no == '122')
+	{	var TypeName = 'bart_half_combined'; }
+	else if (map_group_no == '123')
+	{	var TypeName = 'Johnston_Scotland_half'; }
+
+	else if (map_group_no == '124')
+	{	var TypeName = 'Gall_and_Inglis'; }
+	else if (map_group_no == '125')
+	{	var TypeName = 'bart_half_combined'; }
+	else if (map_group_no == '147')
+	{	var TypeName = 'os_half_inch'; }
+
+	else if (map_group_no == '148')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '149')
+	{	var TypeName = 'os_quarter_inch'; }
+	else if (map_group_no == '150')
+	{	var TypeName = 'os_quarter_inch'; }
+	else if (map_group_no == '151')
+	{	var TypeName = 'os_quarter_inch'; }
+	else if (map_group_no == '152')
+	{	var TypeName = 'os_quarter_inch'; }
+	else if (map_group_no == '153')
+	{	var TypeName = 'os_quarter_inch'; }
+	else if (map_group_no == '154')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '155')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '156')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '157')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '158')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '159')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '160')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '161')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '162')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '163')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '167')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '168')
+	{	var TypeName = 'OS_National_Grid_all_find'; } 
+	else if (map_group_no == '169')
+	{	var TypeName = 'os_indexes_counties'; } 
+	else if (map_group_no == '170')
+	{	var TypeName = 'os_indexes_one_inch'; } 
+	else if (map_group_no == '171')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '173')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '174')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '176')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '180')
+	{	var TypeName = 'OS_25inch_blue_and_black'; } 
+	else if (map_group_no == '184')
+	{	var TypeName = 'nls:OS_ten_mile_planning_and_great_britain'; } 
+	else if (map_group_no == '185')
+	{	var TypeName = 'nls:OS_ten_mile_planning_and_great_britain'; } 
+	else if (map_group_no == '187')
+	{	var TypeName = 'OS_Town_Plans'; }
+	else if (map_group_no == '188')
+	{	var TypeName = 'OS_Town_Plans'; }
+	else if (map_group_no == '189')
+	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '191')
+	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '192')
+	{	var TypeName = 'catalog_air_photos'; }
+	else if (map_group_no == '200')
+	{	var TypeName = 'OS_Town_Plans'; }
+	else if (map_group_no == '210')
+	{	var TypeName = 'OS_One_Inch_Agricultural_Land_Classification'; }
+	else if (map_group_no == '212')
+	{	var TypeName = 'os_half_inch_admin'; }
+	else if (map_group_no == '213')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '214')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '215')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '216')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '217')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '218')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '219')
+	{	var TypeName = 'os_indexes_one_inch'; }
+	else
+	{
+	var TypeName = 'OS_one_inch_combined';
+	}
+
+
+//	alert(TypeName);
+
+	var urlgeoserver =  'https://geoserver3.nls.uk/geoserver/wfs?service=WFS' + 
+	 			'&version=2.0.0&request=GetFeature&typename=' + TypeName +
+				'&PropertyName=(the_geom,GROUP,IMAGE,IMAGETHUMB,IMAGEURL,SHEET,DATES,YEAR)&outputFormat=text/javascript&format_options=callback:loadFeatures' +
+				'&srsname=EPSG:900913&CQL_FILTER=IMAGE=' + pageurl;
+
+		
+		var geojsonFormat = new GeoJSON();
+
+		var url = urlgeoserver;
+
+		var vectorSource = new VectorSource();
+		var vectorLayer = new VectorLayer({
+			mosaic_id: '200',
+		  	title: "vectors - vectors",
+		        source: vectorSource
+		});
+
+		// generate a GetFeature request
+		var featureRequest = new WFS().writeGetFeature({
+		  service: 'WFS',
+		  request: 'GetFeature',
+		  srsName: 'EPSG:3857',
+		  featureNS: 'nls',
+		  featurePrefix: 'nls',
+		  featureTypes: [TypeName],
+		  propertyNames: ['the_geom','GROUP','IMAGE','IMAGETHUMB','IMAGEURL','SHEET','DATES','YEAR'],
+		  outputFormat: 'application/json',
+		  filter: equalToFilter ('IMAGE', pageurl)
+		});
+		
+
+		
+		// then post the request and add the received features to a layer
+		fetch('https://geoserver3.nls.uk/geoserver/wfs?service=WFS', {
+
+	      headers : { 
+	        'Content-Type': 'text/xml'
+//	        'Accept': 'application/json'
+//			'Access-Control-Allow-Origin': '*'
+	       },
+
+		  method: 'POST',
+//		  mode: 'no-cors',
+//		  body: new URLSearchParams(featureRequest)
+		  body: new XMLSerializer().serializeToString(featureRequest)
+		}).then(function(response) {
+
+		  return response.json();
+		}).then(function(json) {
+
+// console.log(text);
+
+
+
+		  var features = new GeoJSON().readFeatures(json);
+		  vectorSource.addFeatures(features);
+
+
+		if (features.length < 1)
+
+	{
+		
+				document.getElementById('mobile-notification').innerHTML = "Sorry, couldn't locate this map"; 
+		if (map.getLayers().getArray()[1].getSource().getFeatures().length > 0)
+				{map.getLayers().getArray()[1].getSource().clear(); }
+
+		setTimeout( function(){
+			document.getElementById("mobile-notification").innerHTML = "";
+			jQuery("#mobile-notification").hide();
+
+		}, 1500); // delay 1000 ms
+
+		return;
+	}
+
+
+		else if (features.length > 0)
+
+		{
+			
+
+
+			var coords3857 = [];
+			coords3857 = features[0].getGeometry().getExtent();
+	
+// 			alert("Extents 3857: " + coords3857);
+			var coords4326 = [];
+	      		var extent4326 = applyTransform(coords3857, getTransform("EPSG:3857" , "EPSG:4326"));
+
+			var lon_extent = extent4326[2] - extent4326[0]; 
+			var lat_extent = extent4326[3] - extent4326[1]; 
+
+			var lon_from_pixel = lon_extent * 0.5;
+			var lat_from_pixel = lat_extent * 0.5;
+
+			var x = extent4326[0] + lon_from_pixel;
+			var y = extent4326[1] + lat_from_pixel;
+
+			var group = features[0].get('GROUP');
+	
+			var zoom = '13';
+
+        	  if (map_group_no == 8) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=7&zoom=12&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 31) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=9&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 32) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=10&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+      	  else if (map_group_no == 33) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=168&zoom=15&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 34) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=168&zoom=15&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 35) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=5&zoom=14&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 36) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=6&zoom=14&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 37) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=2&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 38) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=205&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 39) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=1&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 40) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=164&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 41) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=117746211&zoom=17&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 43) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=165&zoom=10&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 44) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=162&zoom=7&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+
+          else if (map_group_no == 45) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=156&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 49) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=8&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 50) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=156&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 51) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=179&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 54) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=160&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 55) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=11&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 56) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=12&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 57) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=163&zoom=17&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 58) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=161&zoom="  + zoom +  "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 59) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=171&zoom=14&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 60) { window.location = "https://maps.nls.uk/geo/explore/#zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4) + "&layers=" + pageurl; }
+          else if (map_group_no == 61) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=193&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 63) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=74428076&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 64) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=176&zoom=15&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 65) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=174&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 66) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=177&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 69) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=107116239&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 70) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=117746211&zoom=17&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 77) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=180&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 80) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=179&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 83) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=190&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 84) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=191&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 85) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=192&zoom=10&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 89) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=199&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 90) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=199&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 92) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=196&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 93) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=197&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 95) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=195&zoom=10&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 96) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=196&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 97) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=164&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 98) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=199&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 99) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=173&zoom=17&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 100) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=198&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 101) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=200&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 102) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=198&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 103) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=220&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 104) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=10&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 105) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=10&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 106) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=219&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 107) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=204&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 108) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=203&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 109) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=202&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 110) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=224&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 111) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=222&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 113) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=10&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 116) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=168&zoom=13&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 118) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=208&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 119) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=210&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 120) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=156&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 121) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=7&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 122) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=156&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 123) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=156&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 124) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=156&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 125) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=222&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 126) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=156&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 147) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=220&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 148) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=224&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 149) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=224&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 150) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=221&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 151) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=165&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 152) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=223&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 153) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=165&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 154) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=222&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 155) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=222&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 156) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=222&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 157) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=222&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 158) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=222&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 159) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=222&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 160) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=222&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 161) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=222&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 162) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=222&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 163) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=222&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 164) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=11&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 165) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=11&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 166) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=11&zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 167) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=165&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if ((map_group_no == 168) && (y.toFixed(4) > 54)) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=170&zoom=16&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if ((map_group_no == 168) && (y.toFixed(4) < 54)) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=173&zoom=16&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 171) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=226&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 172) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=172&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 173) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=226&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 174) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=227&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 175) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=175&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 176) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=227&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 180) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=241&zoom=13&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 187) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=117746212&zoom=17&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 188) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=188&zoom=17&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+     	  else if (map_group_no == 189) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=6&zoom=14&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+		  else if (map_group_no == 191) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=6&zoom=14&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+		  else if (map_group_no == 192) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=253&zoom=14&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+		  else if (map_group_no == 195) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=255&zoom=14&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+          else if (map_group_no == 200) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=117746212&zoom=17&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+	      else if (map_group_no == 210) { window.location = "https://maps.nls.uk/openlayers.cfm?m=1&id=174&zoom=11&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }		  
+	else {
+	window.location = "https://" + window.location.hostname + "/geo/explore/#zoom=" + zoom + "&lat=" + y.toFixed(4) + "&lon=" + x.toFixed(4); }
+		}
+
+
+//		  map.getView().fit(vectorSource.getExtent());
+
+
+
+		});
+	});
+
+
+
+var showiiifInput = document.getElementById("showiiif");
+
+if(showiiifInput){
+
+showiiifInput.addEventListener('click', function() {
+
+	if(jQuery('#showlocationinfo').is(':visible')){
+		jQuery("#showlocationinfo").hide();
+	};
+
+	history.pushState("", document.title, window.location.pathname + window.location.search);
+
+	var pageurl1 = window.location.href;
+
+	if (pageurl1.indexOf("https://maps.nls.uk/view/") >= 0)
+
+
+	{
+
+	console.log("pageurl: " + pageurl);
+
+
+			var pageurl = pageurl1.replace('https://maps.nls.uk/view/', '');
+
+	console.log("pageurl1: " + pageurl1);
+
+			var image_id = pageurl1.replace('https://maps.nls.uk/view/','');
+			var image_id_length = image_id.length;
+			var image_id_prefix4 = image_id.substring(0, 4); 
+			if ((image_id_length == 8) && (image_id_prefix4 !== '0000'))
+			{ 
+			var iiifurl = 'https://map-view.nls.uk/iiif/2/' + image_id_prefix4 + '%2F' + image_id + '/info.json'; 
+			}
+			else if ((image_id_length == 8) && (image_id_prefix4 == '0000'))
+			{ 
+
+			var image_id_4 = image_id.replace('0000','');
+			var image_id_4_prefix1 = image_id_4.substring(0, 1); 
+				if (image_id_4_prefix1 == '0')
+				{ 
+				var image_id_4_new = image_id_4.substring(1, 4);
+				var iiifurl = 'https://map-view.nls.uk/iiif/2/' + image_id_4_new + '/info.json'; 
+
+				}
+				else 
+				{
+				var iiifurl = 'https://map-view.nls.uk/iiif/2/' + image_id_4 + '/info.json'; 
+				}
+			}
+			else if (image_id_length == 9) 
+			{ var image_id_prefix5 = image_id.substring(0, 5); 
+		
+			var iiifurl = 'https://map-view.nls.uk/iiif/2/' + image_id_prefix5 + '%2F' + image_id + '/info.json'; 
+			}
+			console.log("iifurl :" + iiifurl);
+			var bbox_suffix = '&bbox=-8.5693359,55.0657869,0.3076172,59.310768';
+			var iiifurl_escape = encodeURI(iiifurl + bbox_suffix);
+			var allmaps_editor = 'https://editor.allmaps.org/#/georeference?url=' + iiifurl_escape ;
+
+			jQuery("#showIIIFinfo").show();
+			document.getElementById('showIIIFinfo').innerHTML = '<button type="button" id="hideIIIF" class="close" aria-label="Close">' +
+                  						    '<span aria-hidden="true">&times;</span></button><h3>IIIF Image API - <code>info.json</code> for this map:</h3><a href="' + iiifurl + '" target="remotes">' + iiifurl + '</a><br/>' +
+								    '<p>This <a href="https://iiif.io/api/image/2.1/" target="remotes">IIIF Image API</a> <code>info.json</code> endpoint can be' +
+								    ' used inside <a href="https://iiif.io/apps-demos/" target="remotes">IIIF viewers</a>, in <a href="https://www.georeferencer.com/">Georeferencer</a> or<br/><a href="' + allmaps_editor +'">Allmaps Editor</a> (for georeferencing), or in transcription software ' +
+								    '(eg. <a href="https://recogito.pelagios.org/" target="remotes">Recogito</a>).</p> '; 
+
+			jQuery("#hideIIIF").click(function(){
+			        jQuery("#showIIIFinfo").hide();
+				document.getElementById("map").focus();
+			 });
+
+		}
+	else
+	{
+	return;
+	}
+
+
+    });
+
+}
+
+
+
+
+
+
 var viewlocationInput = document.getElementById("viewlocation");
 
 if(viewlocationInput){
@@ -1580,7 +2517,7 @@ if(viewlocationInput){
 	viewlocationInput.addEventListener('click', function() {
 	
 			if (map_group_no == 31)
-					{ document.getElementById('explorelayerinfo').innerHTML = '(Air Photo Mosaics, 1944-1950 layer)';  }
+					{ document.getElementById('explorelayerinfo').innerHTML = '(Air Photo Mosaics, 1:10,560 1944-1950 layer)';  }
 				if (map_group_no == 32)
 					{ document.getElementById('explorelayerinfo').innerHTML = '(OS 1:25,000, 1937-61 layer)'; }
 				if (map_group_no == 33)
@@ -1599,8 +2536,10 @@ if(viewlocationInput){
 					{ document.getElementById('explorelayerinfo').innerHTML = '(OS One-inch, 2nd ed., 1885-1900 layer)'; }
 				if (map_group_no == 40)
 					{ document.getElementById('explorelayerinfo').innerHTML = '(OS One-inch, Popular, 1921-1930 layer)'; }
-				if (map_group_no == 43)
+				if (map_group_no == 41)
 					{ document.getElementById('explorelayerinfo').innerHTML = '(OS Ten mile, Admin, 1956 layer)'; }
+				if (map_group_no == 43)
+					{ document.getElementById('explorelayerinfo').innerHTML = '(OS Town Plans, 1840s-1890s 1:500 layer)'; }
 				if (map_group_no == 44)
 					{ document.getElementById('explorelayerinfo').innerHTML = '(OS Quarter inch, 3rd ed, 1921-1923 layer)'; }
 				if (map_group_no == 45)
@@ -1776,7 +2715,19 @@ if(viewlocationInput){
 				if (map_group_no == 188)
 					{ document.getElementById('explorelayerinfo').innerHTML = '(OS London, five-foot, 1893-96 layer)'; }
 				if (map_group_no == 189)
-					{ document.getElementById('explorelayerinfo').innerHTML = '(OS six-inch, 1888-1913 layer)'; }
+					{ document.getElementById('explorelayerinfo').innerHTML = '(OS Six-inch, 2nd ed., 1888-1913 layer)'; }
+				if (map_group_no == 191)
+					{ document.getElementById('explorelayerinfo').innerHTML = '(OS Six-inch, 2nd ed., 1888-1913 layer)'; }
+				if (map_group_no == 192)
+					{ document.getElementById('explorelayerinfo').innerHTML = '(Air Photo Mosaics, 1:1,250 1944-1950 layer)';  }
+				if (map_group_no == 195)
+					{ document.getElementById('explorelayerinfo').innerHTML = '(OS One-inch, 1919-1926 layer)';  }
+				if (map_group_no == 200)
+					{ document.getElementById('explorelayerinfo').innerHTML = '(OS Town Plans, 1840s-1890s 1:1,056 layer)'; }
+				if (map_group_no == 210)
+					{ document.getElementById('explorelayerinfo').innerHTML = '(Land utilisation, 1931-35 layer)'; }
+				if (map_group_no == 212)
+					{ document.getElementById('explorelayerinfo').innerHTML = '(OS One-inch, 2nd ed., 1885-1900 layer)'; }
 //				else 
 //					{ document.getElementById('explorelayerinfo').innerHTML = ''; }
 
@@ -1801,9 +2752,249 @@ if(viewlocationInput){
 }
 
 
+
+
+
+
+var footermoreInput = document.getElementById("footermore");
+
+if(footermoreInput){
+
+	footermoreInput.addEventListener('click', function() {
+	
+			if (map_group_no == 31)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Air Photo Mosaics, 1:10,560 1944-1950 layer)';  }
+				if (map_group_no == 32)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS 1:25,000, 1937-61 layer)'; }
+				if (map_group_no == 33)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS 25 inch, 2nd ed., 1892-1914 layer)'; }
+				if (map_group_no == 34)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS 25 inch, 2nd ed., 1892-1914 layer)'; }
+				if (map_group_no == 35)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Six-inch, 1st ed., 1843-1882 layer)'; }
+				if (map_group_no == 36)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Six-inch, 2nd ed., 1888-1913 layer)'; }
+				if (map_group_no == 37)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, Popular, 1921-30 layer)'; }
+				if (map_group_no == 38)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, 1st ed., 1857-1891 layer)'; }
+				if (map_group_no == 39)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, 2nd ed., 1885-1900 layer)'; }
+				if (map_group_no == 40)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, Popular, 1921-1930 layer)'; }
+				if (map_group_no == 41)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Town Plans, 1840s-1890s 1:500 layer)'; }
+				if (map_group_no == 43)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter inch, 3rd ed, 1921-1923 layer)'; }
+				if (map_group_no == 44)
+					{ document.getElementById('explorelayerinfomobile').innerHTML =  '(OS Ten mile, Admin, 1956 layer)'; }
+				if (map_group_no == 45)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Bartholomew Half-inch, 1899-1905 layer)'; }
+				if (map_group_no == 49)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Bartholomew Half-inch, 1926-35 layer)'; }
+				if (map_group_no == 50)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Bartholomew Half-inch, 1897-1907 layer)'; }
+				if (map_group_no == 51)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Bartholomew Half-inch, 1919-1924 layer)'; }
+				if (map_group_no == 52)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch (Outline), 1885-1900 layer)'; }
+				if (map_group_no == 53)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch (Outline), 1885-1900 layer)'; }
+				if (map_group_no == 54)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, 1892-1908 layer)'; }
+				if (map_group_no == 55)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, 1955-1961 layer)'; }
+				if (map_group_no == 56)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, 1945-1948 layer)'; }
+				if (map_group_no == 57)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS London, five-foot, 1893-96 layer)'; }
+				if (map_group_no == 58)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch (hills), 1885-1903 layer)'; }
+				if (map_group_no == 59)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS six-inch, 1888-1913 layer)'; }
+				if (map_group_no == 60)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Trench maps, 1914-1918 layer)'; }
+				if (map_group_no == 61)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS 1:10,560, 1940s-1970 layer)'; }
+				if (map_group_no == 64)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS 25 inch, 1892-1914 layer)'; }
+				if (map_group_no == 65)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Land utilisation, 1931-35 layer)'; }
+				if (map_group_no == 66)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Macaulay soil maps, 1950s-60s layer)'; }
+				if (map_group_no == 69)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Hong-Kong, 1840s layer)'; }
+				if (map_group_no == 70)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Town Plans, 1840s-1890s 1:500 layer)'; }
+				if (map_group_no == 80)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Bartholomew Half-inch, 1919-1924 layer)'; }
+				if (map_group_no == 84)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Half-Inch (MOT), 1923 layer)'; }
+				if (map_group_no == 85)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Bartholomew Half-inch, 1940-47 layer)'; }
+				if (map_group_no == 89)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch (hills), 1921-30 layer)'; }
+				if (map_group_no == 90)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch (hills), 1921-30 layer)'; }
+				if (map_group_no == 91)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch (Outline), 1885-1900 layer)'; }
+				if (map_group_no == 92)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Geological One-inch, 1860s-1940s layer)'; }
+				if (map_group_no == 93)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Geological six-inch, 1900s-1940s layer)'; }
+				if (map_group_no == 95)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, GSGS 3906 1940-43 layer)'; }
+				if (map_group_no == 96)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Geological One-inch, 1860s-1940s layer)'; }
+				if (map_group_no == 97)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, Popular, 1921-30 layer)'; }
+				if (map_group_no == 98)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, Popular (Outline), 1921-30 layer)'; }
+				if (map_group_no == 99)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS 1:1,250/2,500, 1940s-60s layer)'; }
+				if (map_group_no == 100)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, GSGS 3908, 1940-43 layer)'; }
+				if (map_group_no == 101)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, Popular (Outline), 1945-48 layer)'; }
+				if (map_group_no == 102)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, GSGS 3908, 1940-43 layer)'; }
+				if (map_group_no == 103)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Half-inch, Water in blue, 1942 layer)'; }
+				if (map_group_no == 104)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS 1:25,000, 1937-61)'; }
+				if (map_group_no == 105)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS 1:25,000, 1937-61)'; }
+				if (map_group_no == 106)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS 1:25,000 (Outline), 1945-65)'; }
+				if (map_group_no == 107)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Half-inch (layers), 1908-18)'; }
+				if (map_group_no == 108)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Half-inch (hills), 1908-18)'; }
+				if (map_group_no == 109)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch 3rd ed, 1902-23)'; }
+				if (map_group_no == 110)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch 1st ed, 1901-3)'; }
+				if (map_group_no == 111)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch 4th ed, 1935-7)'; }
+				if (map_group_no == 113)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS 1:25,000, 1937-61)'; }
+				if (map_group_no == 116)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(25 inch, 2nd ed., 1892-1914 layer)'; }
+				if (map_group_no == 118)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Survey of India, Half-inch, 1916-25 layer)'; }
+				if (map_group_no == 119)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Survey of India, One-inch, 1912-45 layer)'; }
+				if (map_group_no == 120)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Bartholomew Half-inch, 1897-1907 layer)'; }
+				if (map_group_no == 121)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Bartholomew Survey Atlas, 1912 layer)'; }
+				if (map_group_no == 122)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Bartholomew Half-inch, 1897-1907 layer)'; }
+				if (map_group_no == 123)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Bartholomew Half-inch, 1897-1907 layer)'; }
+				if (map_group_no == 124)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Bartholomew Half-inch, 1897-1907 layer)'; }
+				if (map_group_no == 125)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch 4th ed, 1935-7)'; }
+				if (map_group_no == 126)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Bartholomew Half-inch, 1897-1907 layer)'; }
+				if (map_group_no == 144)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch (Outline), 1885-1900 layer)'; }
+				if (map_group_no == 145)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch (Outline), 1885-1900 layer)'; }
+				if (map_group_no == 147)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Half-inch, Water in blue, 1942 layer)'; }
+				if (map_group_no == 148)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch, 1st ed (Outline), 1900-6 layer)'; }
+				if (map_group_no == 149)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch, 1st ed (Outline), 1900-6 layer)'; }
+				if (map_group_no == 150)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch, 1st ed (Hills), 1900-6 layer)'; }
+				if (map_group_no == 151)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch, 3rd ed, 1921-1923 layer)'; }
+				if (map_group_no == 152)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch, Civil Air, 1929-1930 layer)'; }
+				if (map_group_no == 153)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch, 3rd ed, 1921-1923 layer)'; }
+				if (map_group_no == 154)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch 4th ed, 1935-7)'; }
+				if (map_group_no == 155)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch 4th ed, 1935-7)'; }
+				if (map_group_no == 156)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch 4th ed, 1935-7)'; }
+				if (map_group_no == 157)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch 4th ed, 1935-7)'; }
+				if (map_group_no == 158)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch 4th ed, 1935-7)'; }
+				if (map_group_no == 159)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch 4th ed, 1935-7)'; }
+				if (map_group_no == 160)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch 4th ed, 1935-7)'; }
+				if (map_group_no == 161)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch 4th ed, 1935-7)'; }
+				if (map_group_no == 162)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch 4th ed, 1935-7)'; }
+				if (map_group_no == 163)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch 4th ed, 1935-7)'; }
+				if (map_group_no == 164)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, 1955-1961 layer)'; }
+				if (map_group_no == 165)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, 1955-1961 layer)'; }
+				if (map_group_no == 166)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, 1955-1961 layer)'; }
+				if (map_group_no == 167)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch, 3rd ed, 1921-1923 layer)'; }
+				if (map_group_no == 168)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS 1:1,250/2,500, 1940s-60s layer)'; }
+				if (map_group_no == 171)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch, Admin. 1950-52 layer)'; }
+				if (map_group_no == 173)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch, Admin. 1950-52 layer)'; }
+				if (map_group_no == 174)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch, Admin. ca. 1960 layer)'; }
+				if (map_group_no == 176)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Quarter-inch, Admin. ca. 1960 layer)'; }
+				if (map_group_no == 176)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS 25 inch "blue-and-blacks" 1890s-1940s layer)'; }
+				if (map_group_no == 187)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Town Plans, 1840s-1890s 1:1,056 layer)'; }
+				if (map_group_no == 188)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS London, five-foot, 1893-96 layer)'; }
+				if (map_group_no == 189)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Six-inch, 2nd ed., 1888-1913 layer)'; }
+				if (map_group_no == 191)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Six-inch, 2nd ed., 1888-1913 layer)'; }
+				if (map_group_no == 192)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(Air Photo Mosaics, 1:1,250 1944-1950 layer)';  }
+				if (map_group_no == 195)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS One-inch, 1919-1926 layer)';  }
+				if (map_group_no == 200)
+					{ document.getElementById('explorelayerinfomobile').innerHTML = '(OS Town Plans, 1840s-1890s 1:1,056 layer)'; }
+				if (map_group_no == 210)
+					{ document.getElementById('explorelayerinfo').innerHTML = '(Land utilisation, 1931-35 layer)'; }	
+				if (map_group_no == 212)
+					{ document.getElementById('explorelayerinfo').innerHTML = '(OS One-inch, 2nd ed., 1885-1900 layer)'; }				
+//				else 
+//					{ document.getElementById('explorelayerinfomobile').innerHTML = ''; }
+
+				jQuery("#showlocationinfo").show();
+				document.getElementById("map").focus();
+
+
+
+
+ 	});
+	
+	
+}
+
+
 jQuery('#showmaplocationpopup').click(function(){ 
 
 	jQuery("#showlocationinfo").hide();
+	
+
+	
 
 	jQuery("#showmaplocationinfo").show();
 
@@ -1843,8 +3034,10 @@ console.log("pageurl: "  + pageurl);
 	{	var TypeName = 'OS_6inch_all_find'; }
 	else if (map_group_no == '36')
 	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '41')
+	{	var TypeName = 'OS_Town_Plans'; }
 	else if (map_group_no == '42')
-	{	var TypeName = 'os_indexes'; }
+	{	var TypeName = 'os_indexes_counties'; }
 	else if (map_group_no == '43')
 	{	var TypeName = 'os_quarter_inch'; }
 	else if (map_group_no == '44')
@@ -1871,13 +3064,13 @@ console.log("pageurl: "  + pageurl);
 	else if (map_group_no == '60')
 	{	var TypeName = 'TM_Combined_sorted_27700'; }
 	else if (map_group_no == '65')
-	{	var TypeName = 'One_Inch_land_utilisation_scot'; }
+	{	var TypeName = 'One_Inch_Land_Utilisation_Britain'; }
 	else if (map_group_no == '66')
 	{	var TypeName = 'Soil_Survey'; }
 	else if (map_group_no == '69')
 	{	var TypeName = 'hong_kong'; }
 	else if (map_group_no == '70')
-	{	var TypeName = 'OS_Town_Plans_Eng'; }
+	{	var TypeName = 'OS_Town_Plans'; }
 	else if (map_group_no == '80')
 	{	var TypeName = 'bart_half_combined'; }  
 	else if (map_group_no == '83')
@@ -1973,9 +3166,9 @@ console.log("pageurl: "  + pageurl);
 	else if (map_group_no == '168')
 	{	var TypeName = 'OS_National_Grid_all_find'; } 
 	else if (map_group_no == '169')
-	{	var TypeName = 'os_indexes'; } 
+	{	var TypeName = 'os_indexes_counties'; } 
 	else if (map_group_no == '170')
-	{	var TypeName = 'os_indexes'; } 
+	{	var TypeName = 'os_indexes_one_inch'; } 
 	else if (map_group_no == '171')
 	{	var TypeName = 'os_quarter_inch'; } 
 	else if (map_group_no == '173')
@@ -1991,11 +3184,35 @@ console.log("pageurl: "  + pageurl);
 	else if (map_group_no == '185')
 	{	var TypeName = 'nls:OS_ten_mile_planning_and_great_britain'; } 
 	else if (map_group_no == '187')
-	{	var TypeName = 'OS_Town_Plans_Eng'; }
+	{	var TypeName = 'OS_Town_Plans'; }
 	else if (map_group_no == '188')
-	{	var TypeName = 'OS_Town_Plans_Eng'; }
+	{	var TypeName = 'OS_Town_Plans'; }
 	else if (map_group_no == '189')
 	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '191')
+	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '192')
+	{	var TypeName = 'catalog_air_photos'; }
+	else if (map_group_no == '200')
+	{	var TypeName = 'OS_Town_Plans'; }
+	else if (map_group_no == '210')
+	{	var TypeName = 'OS_One_Inch_Agricultural_Land_Classification'; }
+	else if (map_group_no == '212')
+	{	var TypeName = 'os_half_inch_admin'; }
+	else if (map_group_no == '213')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '214')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '215')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '216')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '217')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '218')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '219')
+	{	var TypeName = 'os_indexes_one_inch'; }
 	else
 	{
 	var TypeName = 'OS_one_inch_combined';
@@ -2003,7 +3220,7 @@ console.log("pageurl: "  + pageurl);
 
 
 
-	var urlgeoserver =  'https://geo-server.nls.uk/geoserver/wfs?service=WFS' + 
+	var urlgeoserver =  'https://geoserver3.nls.uk/geoserver/wfs?service=WFS' + 
 	 			'&version=2.0.0&request=GetFeature&typename=' + TypeName +
 				'&PropertyName=(the_geom,GROUP,IMAGE,IMAGETHUMB,IMAGEURL,SHEET,DATES,YEAR)&outputFormat=text/javascript&format_options=callback:loadFeatures' +
 				'&srsname=EPSG:900913&CQL_FILTER=IMAGE=' + pageurl;
@@ -2028,8 +3245,10 @@ console.log("pageurl: "  + pageurl);
 
 		// generate a GetFeature request
 		var featureRequest = new WFS().writeGetFeature({
+		  service: 'WFS',
+		  request: 'GetFeature',
 		  srsName: 'EPSG:3857',
-		  featureNS: 'http://nls.uk/',
+		  featureNS: 'nls',
 		  featurePrefix: 'nls',
 		  featureTypes: [TypeName],
 		  propertyNames: ['the_geom','GROUP','IMAGE','IMAGETHUMB','IMAGEURL','SHEET','DATES','YEAR'],
@@ -2037,14 +3256,20 @@ console.log("pageurl: "  + pageurl);
 		  filter: equalToFilter ('IMAGE', pageurl)
 		});
 		
-		// then post the request and add the received features to a layer
-		fetch('https://geoserver3.nls.uk/geoserver/wfs', {
 
-	      	headers : { 
-	        	'Content-Type': 'application/json',
-	        	'Accept': 'application/json'
-	       	 },
+
+		// then post the request and add the received features to a layer
+		fetch('https://geoserver3.nls.uk/geoserver/wfs?service=WFS', {
+
+	      headers : { 
+	        'Content-Type': 'text/xml'
+//	        'Accept': 'application/json'
+//			'Access-Control-Allow-Origin': '*'
+	       },
+
 		  method: 'POST',
+//		  mode: 'no-cors',
+//		  body: new URLSearchParams(featureRequest)
 		  body: new XMLSerializer().serializeToString(featureRequest)
 		}).then(function(response) {
 
@@ -2105,6 +3330,463 @@ console.log("pageurl: "  + pageurl);
 
 
 });
+
+
+
+jQuery('#showmaplocationpopup-mobile').click(function(){ 
+
+
+	jQuery("#morePanel").hide();
+	
+	jQuery("#footermore").show();
+
+	jQuery("#mobile-notification").show();
+
+	document.getElementById('mobile-notification').innerHTML = "Switching to <em>Map Finder</em> viewer... please wait...";
+
+
+	history.pushState("", document.title, window.location.pathname + window.location.search);
+
+	var pageurl1 = window.location.href;
+
+	if (pageurl1.indexOf("https://maps.nls.uk/view/") >= 0)
+		{
+			var pageurl = pageurl1.replace('https://maps.nls.uk/view/', '');
+		}
+	else
+	{
+	var pageurl = '74428019';
+	}
+
+
+console.log("pageurl1: "  + pageurl1);
+console.log("pageurl: "  + pageurl);
+
+
+	var vectorSource;
+
+
+	if (map_group_no == '31')
+	{	var TypeName = 'catalog_air_photos'; }
+	else if (map_group_no == '32')
+	{	var TypeName = 'OS_25000_uk'; }
+	else if (map_group_no == '33')
+	{	var TypeName = 'OS_25inch_all_find';	}
+	else if (map_group_no == '34')
+	{	var TypeName = 'OS_25inch_all_find';	}
+
+	else if (map_group_no == '35')
+	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '36')
+	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '41')
+	{	var TypeName = 'OS_Town_Plans'; }
+	else if (map_group_no == '42')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '43')
+	{	var TypeName = 'os_quarter_inch'; }
+	else if (map_group_no == '44')
+	{	var TypeName = 'OS_ten_mile_planning'; }
+	else if (map_group_no == '45')
+	{	var TypeName = 'bart_half_combined'; }
+
+	else if (map_group_no == '49')
+	{	var TypeName = 'bart_half_combined'; }
+	else if (map_group_no == '50')
+	{	var TypeName = 'bart_half_combined'; }
+	else if (map_group_no == '51')
+	{	var TypeName = 'bart_half_combined'; }
+	else if (map_group_no == '57')
+	{	var TypeName = 'os_london_1056'; }
+	else if (map_group_no == '59')
+	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '60')
+	{	var TypeName = 'TM_Combined_sorted_27700'; }
+	else if (map_group_no == '61')
+	{	var TypeName = 'OS_National_Grid_all_find'; }
+	else if (map_group_no == '64')
+	{	var TypeName = 'OS_25inch_all_find';	}
+	else if (map_group_no == '60')
+	{	var TypeName = 'TM_Combined_sorted_27700'; }
+	else if (map_group_no == '65')
+	{	var TypeName = 'One_Inch_Land_Utilisation_Britain'; }
+	else if (map_group_no == '66')
+	{	var TypeName = 'Soil_Survey'; }
+	else if (map_group_no == '69')
+	{	var TypeName = 'hong_kong'; }
+	else if (map_group_no == '70')
+	{	var TypeName = 'OS_Town_Plans'; }
+	else if (map_group_no == '80')
+	{	var TypeName = 'bart_half_combined'; }  
+	else if (map_group_no == '83')
+	{	var TypeName = 'cyprus_kitchener_3857'; }   
+	else if (map_group_no == '84')
+	{	var TypeName = 'os_half_inch'; }
+	else if (map_group_no == '85')
+	{	var TypeName = 'bart_half_combined'; }
+	else if (map_group_no == '92')
+	{	var TypeName = 'geol_sixinch'; }
+	else if (map_group_no == '93')
+	{	var TypeName = 'geol_sixinch'; }
+	else if (map_group_no == '95')
+	{	var TypeName = 'OS_25000_uk'; }
+	else if (map_group_no == '96')
+	{	var TypeName = 'geol_sixinch'; }
+	else if (map_group_no == '99')
+	{	var TypeName = 'OS_National_Grid_all_find'; }
+	else if (map_group_no == '103')
+	{	var TypeName = 'os_half_inch'; }
+	else if (map_group_no == '104')
+	{	var TypeName = 'OS_25000_uk'; }
+	else if (map_group_no == '105')
+	{	var TypeName = 'OS_25000_uk'; }
+	else if (map_group_no == '106')
+	{	var TypeName = 'OS_25000_uk'; }
+	else if (map_group_no == '107')
+	{	var TypeName = 'os_half_inch'; }
+	else if (map_group_no == '108')
+	{	var TypeName = 'os_half_inch'; }
+	else if (map_group_no == '110')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '111')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '113')
+	{	var TypeName = 'OS_25000_uk'; }
+	else if (map_group_no == '116')
+	{	var TypeName = 'Goad_Insurance_Plans'; }
+	else if (map_group_no == '118')
+	{	var TypeName = 'Survey_of_India_Sheet_58'; }
+	else if (map_group_no == '119')
+	{	var TypeName = 'Survey_of_India_Sheet_58'; }
+	else if (map_group_no == '120')
+	{	var TypeName = 'Johnston_Scotland'; }
+	else if (map_group_no == '121')
+	{	var TypeName = 'bart_half_combined'; }
+	else if (map_group_no == '122')
+	{	var TypeName = 'bart_half_combined'; }
+	else if (map_group_no == '123')
+	{	var TypeName = 'Johnston_Scotland_half'; }
+
+	else if (map_group_no == '124')
+	{	var TypeName = 'Gall_and_Inglis'; }
+	else if (map_group_no == '125')
+	{	var TypeName = 'bart_half_combined'; }
+	else if (map_group_no == '147')
+	{	var TypeName = 'os_half_inch'; }
+
+	else if (map_group_no == '148')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '149')
+	{	var TypeName = 'os_quarter_inch'; }
+	else if (map_group_no == '150')
+	{	var TypeName = 'os_quarter_inch'; }
+	else if (map_group_no == '151')
+	{	var TypeName = 'os_quarter_inch'; }
+	else if (map_group_no == '152')
+	{	var TypeName = 'os_quarter_inch'; }
+	else if (map_group_no == '153')
+	{	var TypeName = 'os_quarter_inch'; }
+	else if (map_group_no == '154')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '155')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '156')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '157')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '158')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '159')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '160')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '161')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '162')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '163')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '167')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '168')
+	{	var TypeName = 'OS_National_Grid_all_find'; } 
+	else if (map_group_no == '169')
+	{	var TypeName = 'os_indexes_counties'; } 
+	else if (map_group_no == '170')
+	{	var TypeName = 'os_indexes_one_inch'; } 
+	else if (map_group_no == '171')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '173')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '174')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '176')
+	{	var TypeName = 'os_quarter_inch'; } 
+	else if (map_group_no == '180')
+	{	var TypeName = 'OS_25inch_blue_and_black'; } 
+	else if (map_group_no == '184')
+	{	var TypeName = 'nls:OS_ten_mile_planning_and_great_britain'; } 
+	else if (map_group_no == '185')
+	{	var TypeName = 'nls:OS_ten_mile_planning_and_great_britain'; } 
+	else if (map_group_no == '187')
+	{	var TypeName = 'OS_Town_Plans'; }
+	else if (map_group_no == '188')
+	{	var TypeName = 'OS_Town_Plans'; }
+	else if (map_group_no == '189')
+	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '191')
+	{	var TypeName = 'OS_6inch_all_find'; }
+	else if (map_group_no == '192')
+	{	var TypeName = 'catalog_air_photos'; }
+	else if (map_group_no == '200')
+	{	var TypeName = 'OS_Town_Plans'; }
+	else if (map_group_no == '210')
+	{	var TypeName = 'OS_One_Inch_Agricultural_Land_Classification'; }
+	else if (map_group_no == '212')
+	{	var TypeName = 'os_half_inch_admin'; }
+	else if (map_group_no == '213')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '214')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '215')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '216')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '217')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '218')
+	{	var TypeName = 'os_indexes_counties'; }
+	else if (map_group_no == '219')
+	{	var TypeName = 'os_indexes_one_inch'; }
+	else
+	{
+	var TypeName = 'OS_one_inch_combined';
+	}
+
+
+
+	var urlgeoserver =  'https://geoserver3.nls.uk/geoserver/wfs?service=WFS' + 
+	 			'&version=2.0.0&request=GetFeature&typename=' + TypeName +
+				'&PropertyName=(the_geom,GROUP,IMAGE,IMAGETHUMB,IMAGEURL,SHEET,DATES,YEAR)&outputFormat=text/javascript&format_options=callback:loadFeatures' +
+				'&srsname=EPSG:900913&CQL_FILTER=IMAGE=' + pageurl;
+
+
+
+		var geojsonFormat = new GeoJSON();
+
+		var url = urlgeoserver;
+
+		var vectorSource = new VectorSource();
+		var vectorLayer = new VectorLayer({
+			mosaic_id: '200',
+		  	title: "vectors - vectors",
+		        source: vectorSource
+		});
+
+		setTimeout( function(){
+
+
+
+
+		// generate a GetFeature request
+		var featureRequest = new WFS().writeGetFeature({
+		  service: 'WFS',
+		  request: 'GetFeature',
+		  srsName: 'EPSG:3857',
+		  featureNS: 'nls',
+		  featurePrefix: 'nls',
+		  featureTypes: [TypeName],
+		  propertyNames: ['the_geom','GROUP','IMAGE','IMAGETHUMB','IMAGEURL','SHEET','DATES','YEAR'],
+		  outputFormat: 'application/json',
+		  filter: equalToFilter ('IMAGE', pageurl)
+		});
+		
+		
+		
+		// then post the request and add the received features to a layer
+		fetch('https://geoserver3.nls.uk/geoserver/wfs?service=WFS', {
+
+	      headers : { 
+	        'Content-Type': 'text/xml'
+//	        'Accept': 'application/json'
+//			'Access-Control-Allow-Origin': '*'
+	       },
+
+		  method: 'POST',
+//		  mode: 'no-cors',
+//		  body: new URLSearchParams(featureRequest)
+		  body: new XMLSerializer().serializeToString(featureRequest)
+		}).then(function(response) {
+
+		  return response.json();
+		}).then(function(json) {
+
+// console.log(text);
+
+
+		  var features = new GeoJSON().readFeatures(json);
+		  vectorSource.addFeatures(features);
+
+		if (features.length > 0)
+
+		{
+
+			var coords3857 = [];
+			coords3857 = features[0].getGeometry().getExtent();
+	
+// 			alert("Extents 3857: " + coords3857);
+			var coords4326 = [];
+	      		var extent = applyTransform(coords3857, getTransform("EPSG:3857" , "EPSG:4326"));
+
+			 var x = extent[0] + (extent[2] - extent[0]) / 2; 
+			 var y = extent[1] + (extent[3] - extent[1]) / 2; 
+
+			var group = features[0].get('GROUP');
+	
+			var zoom = '12';
+
+			window.location = "https://maps.nls.uk/geo/find/#zoom=" + zoom + "&lat=" + y.toFixed(4)  + 
+				"&lon=" + x.toFixed(4)  + "&layers=" + group + "&b=1&z=1&point=" + y.toFixed(4)  + "," + x.toFixed(4); 
+
+		}
+
+			else
+
+
+
+		{ 
+		
+					document.getElementById('mobile-notification').innerHTML = "Sorry, couldn't locate this map"; 
+		setTimeout( function(){
+			document.getElementById("mobile-notification").innerHTML = "";
+			jQuery("#mobile-notification").hide();
+
+		}, 1500); // delay 1000 ms
+
+		return;
+		}
+
+		
+
+//		  map.getView().fit(vectorSource.getExtent());
+
+			}, 500); // delay 50 ms
+
+		});
+
+
+
+});
+
+
+
+	var winlochref = window.location.href;
+
+	var imageID = winlochref.replace('https://maps.nls.uk/view/', '');
+
+	console.log("imageID: " + imageID);
+
+if (imageID == '74479099' )
+	  {
+		console.log("working");
+	  var mrm_geojson = 'https://geo.nls.uk/maps/mrm/74479099.js';
+	  
+	  // adding the Stevenson GeoJSON to the vector source and layer
+
+		var mrm_geojson_source = new VectorSource({
+		    url: mrm_geojson,
+   		    format: new GeoJSON(),
+			projection : 'EPSG:3857'
+		  });
+
+		// the style for the blue lines
+
+				var red_line_thick = new Style({
+				stroke: new Stroke({
+					color: 'rgba(200, 15, 95, 1)',
+					width: 2
+				})
+			});
+			
+		const wkt = 'POLYGON ((844.872192 558.732239,866.676758 555.070801,887.806335 553.939758,909.622864 551.559387,931.283691 549.104492,952.68457 547.071289,974.462769 545.167603,995.604553 543.978699,997.588257 589.191528,974.894714 589.734558,953.616699 590.836304,932.180481 593.198303,910.788513 595.208069,889.087524 597.460205,867.74408 601.820068,845.936768 606.067139,844.872192 558.732239))';
+
+		const format = new WKT();
+
+		const feature = format.readFeature(wkt, {
+		  dataProjection: 'EPSG:3857',
+		  featureProjection: 'EPSG:3857',
+		});
+
+		const mrm_vector = new VectorLayer({
+		  source: new VectorSource({
+			features: [feature],
+			style: red_line_thick
+		  }),
+		});
+
+		var mrm_geojson_layer = new VectorLayer({
+		  title: "MRMGeoJSON",
+		  source: mrm_geojson_source,
+			visible: true,
+	        style: red_line_thick,
+	      });
+	  
+	    var maplayerlength = map.getLayers().getLength();
+
+		map.getLayers().insertAt(maplayerlength,mrm_geojson_layer);
+		
+		
+		setTimeout( function(){
+
+
+//					console.log ("mrm_geojson_source.getExtent(): " + mrm_geojson_source.getExtent());
+					
+					
+					var maplayerlength = map.getLayers().getLength();
+					var toplayer = parseInt(maplayerlength - 1);
+
+					var geojson_features_length = map.getLayers().getArray()[parseInt(toplayer)].getSource().getFeatures().length;
+
+					console.log ("geojson_features_length: " + geojson_features_length);
+					
+					const displayFeatureInfo = function (pixel) {
+						
+						jQuery("#iiif-notification").show();
+					  const features = [];
+					  map.forEachFeatureAtPixel(pixel, function (feature) {
+						features.push(feature);
+					  });
+					  if (features.length > 0) {
+						const info = [];
+						let i, ii;
+						for (i = 0, ii = features.length; i < ii; ++i) {
+						  info.push(features[i].get('text'));
+						}
+						document.getElementById('iiif-notification').innerHTML =  info.join(', ') || '&nbsp';
+					  } else {
+						document.getElementById('iiif-notification').innerHTML =  '&nbsp;';
+					  }
+					};
+
+					map.on('pointermove', function (evt) {
+					  if (evt.dragging) {
+						return;
+					  }
+					  const pixel = map.getEventPixel(evt.originalEvent);
+					  displayFeatureInfo(pixel);
+					});
+		
+
+			}, 5000); // delay 50 ms
+	  }
+	else
+		{
+		return;
+		}
+	
+
+
+console.log("map.getView().getProjection(); " + map.getView().getProjection().getCode());
 
 	/**
 	 * Currently drawn feature.
@@ -2292,7 +3974,7 @@ if(drawInput){
 	  draw.on('drawend',
 	      function(evt) {
          	document.getElementById('stopmeasuringmessage').innerHTML = 'Click and drag on drawn features if you would like to move them.';
-         	document.getElementById('measuremessage').innerHTML = 'To save, click on <em>Print PDF</em>, or right-click and choose <em>Save image as...</em> or <em>Export JSON</em>';
+         	document.getElementById('measuremessage').innerHTML = 'To save, click on <em>Download PDF</em>, or right-click and choose <em>Save image as...</em> or <em>Export JSON</em>';
 	        jQuery("#removelastfeaturebutton").show();
 	        jQuery("#exportbutton").show();
 	      }, this);
@@ -2321,7 +4003,7 @@ if(drawInput){
 	  draw.on('drawend',
 	      function(evt) {
          	document.getElementById('stopmeasuringmessage').innerHTML = 'Click and drag on drawn features if you would like to move them.';
-         	document.getElementById('measuremessage').innerHTML = 'To save, click on <em>Print PDF</em>, or right-click and choose <em>Save image as...</em> or <em>Export JSON</em>';
+         	document.getElementById('measuremessage').innerHTML = 'To save, click on <em>Download PDF</em>, or right-click and choose <em>Save image as...</em> or <em>Export JSON</em>';
 	        jQuery("#removelastfeaturebutton").show();
 	        jQuery("#exportbutton").show();
 	      }, this);
@@ -2471,6 +4153,7 @@ if(drawInput){
 
 
 		var lastlayerfeatures = map.getLayers().getArray()[parseInt(toplayer)].getSource().getFeatures();
+
 /*
 		lastlayerfeatures.forEach( function(feature) {
 			var geometry = feature.getGeometry();
@@ -2486,19 +4169,28 @@ if(drawInput){
 			feature.getGeometry().setCoordinates([lon, Math.abs(lat2)]);
 
 			}
-			else if (name = 'LineString')
+			else 
 			{
 				geometry.forEachSegment(function (segment) {
 
-				var extent = map.getLayers().getArray()[0].getSource().getTileGrid().getExtent();
-				var lon = segment.getCoordinates()[0];
-				var lat = segment.getCoordinates()[1];
-				var lat1 = Math.round(lat);
-				var lat2 = (Math.abs(extent[1])) - (Math.abs(lat1));
-				var lat3 = -lat;
-				segment.setCoordinates([lon, Math.abs(lat2)]);
+//				var extent = map.getLayers().getArray()[0].getSource().getTileGrid().getExtent();
+//				var lon = segment.getCoordinates()[0];
+//				var lat = segment.getCoordinates()[1];
+//				var lat1 = Math.round(lat);
+//				var lat2 = (Math.abs(extent[1])) - (Math.abs(lat1));
+//				var lat3 = -lat;
+//				segment.setCoordinates([lon, Math.abs(lat2)]);
 
-				});
+
+//			var extent = map.getLayers().getArray()[0].getSource().getTileGrid().getExtent();
+//			var lon = feature.getGeometry().getCoordinates()[0];
+//			var lat = feature.getGeometry().getCoordinates()[1];
+//			var lat1 = Math.round(lat);
+//			var lat2 = (Math.abs(extent[1])) - (Math.abs(lat1));
+//			var lat3 = -lat;
+//			feature.getGeometry().setCoordinates([lon, Math.abs(lat2)]);
+
+			});
 
 			}
 		});
